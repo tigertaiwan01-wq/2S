@@ -31,7 +31,7 @@
 <body>
 
 <div id="authOverlay">
-    <h2>🔒 系統鎖定 (1225)</h2>
+    <h2>🔒 輸入密碼</h2>
     <input type="password" id="sysKeyInput" style="flex:none; width: 180px; margin-bottom: 15px; text-align: center;" placeholder="輸入金鑰">
     <button class="btn btn-action" onclick="initSystem()">解鎖進入</button>
 </div>
@@ -268,3 +268,4 @@
 </script>
 </body>
 </html>
+
