@@ -3,39 +3,35 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>專業庫存安全系統 v13.5</title>
+    <title>專業庫存安全系統 v14.0</title>
     <style>
         :root { --primary: #2c3e50; --accent: #3498db; --success: #27ae60; --danger: #e74c3c; }
         body { font-family: "Microsoft JhengHei", sans-serif; background: #f4f7f6; margin: 0; padding: 0; }
         nav { background: var(--primary); color: white; display: flex; justify-content: center; padding: 10px; gap: 5px; position: sticky; top: 0; z-index: 100; }
-        nav button { background: rgba(255,255,255,0.1); border: none; color: white; padding: 10px; cursor: pointer; border-radius: 5px; font-size: 0.9rem; }
+        nav button { background: rgba(255,255,255,0.1); border: none; color: white; padding: 10px; cursor: pointer; border-radius: 5px; }
         nav button.active { background: var(--accent); font-weight: bold; }
         .container { max-width: 1100px; margin: 15px auto; padding: 15px; }
         .page { display: none; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
         .page.active { display: block; }
         .sync-status { text-align: center; font-size: 11px; padding: 5px; background: #eee; color: #666; }
         .input-group { display: flex; gap: 8px; margin-bottom: 15px; flex-wrap: wrap; }
-        input, select { padding: 8px; border: 1px solid #ddd; border-radius: 5px; flex: 1; min-width: 100px; }
+        input, select { padding: 8px; border: 1px solid #ddd; border-radius: 5px; flex: 1; }
         button.btn { padding: 8px 15px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; color: white; }
         .btn-add { background: var(--success); }
         .btn-action { background: var(--accent); }
-        .btn-del { background: var(--danger); font-size: 0.8rem; }
-        .location-badge { background: #e1f5fe; color: #01579b; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-size: 0.85rem; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th, td { border-bottom: 1px solid #eee; padding: 12px 10px; text-align: left; }
         #authOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--primary); color: white; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 2000; }
-        .history-del { background-color: #fff5f5; color: var(--danger); }
     </style>
 </head>
 <body>
 
 <div id="authOverlay">
     <h2>🔒 系統鎖定</h2>
-    <input type="password" id="sysKeyInput" style="flex:none; width: 200px; margin-bottom: 15px; text-align: center;" placeholder="輸入金鑰">
-    <button class="btn btn-action" onclick="initSystem()">解鎖並進入系統</button>
+    <p id="msg" style="color:#f39c12; font-size:0.9rem">請輸入系統金鑰以進行連線</p>
+    <input type="password" id="sysKeyInput" style="flex:none; width: 200px; margin-bottom: 15px; text-align: center;" placeholder="輸入 1225">
+    <button class="btn btn-action" onclick="initSystem()">解鎖進入</button>
 </div>
 
-<div class="sync-status" id="syncLabel">狀態：等待解鎖</div>
+<div class="sync-status" id="syncLabel">狀態：等待驗證</div>
 
 <nav>
     <button onclick="showPage('p1')" id="btn-p1" class="active">🆕 建檔</button>
@@ -56,102 +52,162 @@
         </div>
         <table id="setupTable"><thead><tr><th>名稱</th><th>庫存</th><th>倉位</th><th>管理</th></tr></thead><tbody></tbody></table>
     </div>
-
-    <div id="p2" class="page">
-        <h3>庫存總表 (點擊搬移可變更倉位)</h3>
-        <button class="btn btn-action" style="background:#607d8b; margin-bottom:10px;" onclick="exportToCSV()">📊 匯出 Excel</button>
-        <table id="fullTable"><thead><tr><th>名稱</th><th>總數/剩餘</th><th>目前倉位</th><th>管理</th></tr></thead><tbody></tbody></table>
-    </div>
-
+    <div id="p2" class="page"><h3>庫存總表</h3><button class="btn btn-action" onclick="exportToCSV()">📊 匯出</button><table id="fullTable"><thead><tr><th>名稱</th><th>剩餘</th><th>倉位</th><th>操作</th></tr></thead><tbody></tbody></table></div>
     <div id="p3" class="page">
-        <h3>🛒 外借購物車系統</h3>
-        <div style="background:#f0f7ff; padding:15px; border-radius:10px; margin-bottom:20px; border:2px dashed #3498db;">
+        <h3>🛒 購物車外借</h3>
+        <div style="background:#f0f7ff; padding:15px; border-radius:10px; margin-bottom:20px; border:1px dashed #3498db;">
             <div class="input-group">
                 <select id="cartProductSelect"></select>
                 <input type="number" id="cartQty" value="1" min="1" style="width:60px; flex:none;">
-                <button class="btn btn-add" onclick="addToCart()">➕ 加入清單</button>
+                <button class="btn btn-add" onclick="addToCart()">➕ 加入</button>
             </div>
             <table id="cartTable"><thead><tr><th>品項</th><th>數量</th><th>操作</th></tr></thead><tbody></tbody></table>
-            <div class="input-group" style="margin-top:10px;">
-                <input type="text" id="loanUser" placeholder="輸入借用人姓名">
-                <button class="btn btn-action" onclick="checkoutCart()" style="flex:2;">🚀 確認批次借出</button>
-            </div>
+            <input type="text" id="loanUser" placeholder="借用人" style="margin-top:10px; width:100%">
+            <button class="btn btn-action" onclick="checkoutCart()" style="width:100%; margin-top:10px;">🚀 批次借出</button>
         </div>
-        <h3>目前已借出 (歸還區)</h3>
         <table id="loanTable"><thead><tr><th>借用人</th><th>物品</th><th>數量</th><th>操作</th></tr></thead><tbody></tbody></table>
     </div>
-
-    <div id="p4" class="page">
-        <h3>年度盤點修正</h3>
-        <table id="stocktakeTable"><thead><tr><th>名稱</th><th>帳面數</th><th>操作</th></tr></thead><tbody></tbody></table>
-    </div>
-
-    <div id="p5" class="page">
-        <h3>異動紀錄</h3>
-        <table id="historyTable"><thead><tr><th>時間</th><th>品項</th><th>變動</th><th>原因</th></tr></thead><tbody></tbody></table>
-    </div>
+    <div id="p4" class="page"><h3>盤點修正</h3><table id="stocktakeTable"><thead><tr><th>名稱</th><th>帳面數</th><th>操作</th></tr></thead><tbody></tbody></table></div>
+    <div id="p5" class="page"><h3>異動紀錄</h3><table id="historyTable"><thead><tr><th>時間</th><th>品項</th><th>變動</th><th>原因</th></tr></thead><tbody></tbody></table></div>
 </div>
 
 <script>
-    // ⚠️ 關鍵：請確保這裡替換成你的 Google Script 網址
-    const API_URL = "https://script.google.com/macros/s/AKfycbzabXBVljgap-NVRWnv3w73CGRZuIDAR48K2kpCOOjq1tyYu_gQavJe_lBO0u-Px71Yqw/exec"; 
-    
-    let sysKey = "1225";
+    // -------------------------------------------------------------------------
+    // ⚠️ 請確保這裡填入正確的網址，且該網址在瀏覽器直接打開能看到 {"error":"金鑰錯誤"}
+    const API_URL = "https://script.google.com/macros/s/AKfycbxhEJ7nGzQSm2VzkO34EWFMxYyWisfbQ24DF67tN7tEWOZHenpEMKACdtG9SmGWO4aaSA/exec"; 
+    // -------------------------------------------------------------------------
+
     let products = [], loans = [], history = [], cart = [];
 
     async function initSystem() {
-        const val = document.getElementById('sysKeyInput').value;
-        if (val === sysKey) {
-            try {
-                document.getElementById('syncLabel').innerText = "驗證中...";
-                const success = await syncFromCloud();
-                if (success) {
-                    document.getElementById('authOverlay').style.display = 'none';
-                    renderAll();
-                }
-            } catch (e) {
-                alert("連線出錯，請確認 API 網址是否正確且已發佈為 Anyone！");
-            }
-        } else {
-            alert("金鑰錯誤！");
+        const key = document.getElementById('sysKeyInput').value;
+        if (key !== "1225") return alert("金鑰錯誤！");
+
+        document.getElementById('msg').innerText = "📡 正在連線雲端資料庫，請稍候...";
+        
+        try {
+            const res = await fetch(`${API_URL}?key=1225`);
+            if (!res.ok) throw new Error("API 網址回應異常");
+            const data = await res.json();
+            
+            products = data.products || [];
+            loans = data.loans || [];
+            history = data.history || [];
+            
+            document.getElementById('authOverlay').style.display = 'none';
+            document.getElementById('syncLabel').innerText = "✅ 同步成功";
+            renderAll();
+        } catch (e) {
+            document.getElementById('msg').innerText = "❌ 連線失敗！請檢查 API_URL 是否填寫正確。";
+            alert("錯誤細節：" + e.message + "\n\n1. 請確認 API_URL 已正確填寫。\n2. 請確認 Google Script 已部署為 'Anyone'。");
         }
     }
 
-    async function syncFromCloud() {
-        if (!API_URL || API_URL.includes("你的_")) return alert("請在代碼中填寫 API_URL");
-        const res = await fetch(`${API_URL}?key=${sysKey}`);
-        const data = await res.json();
-        products = data.products || [];
-        loans = data.loans || [];
-        history = data.history || [];
-        document.getElementById('syncLabel').innerText = "同步成功";
-        return true;
-    }
-
     async function save() {
-        document.getElementById('syncLabel').innerText = "雲端儲存中...";
-        await fetch(API_URL, {
-            method: 'POST',
-            mode: 'no-cors',
-            body: JSON.stringify({ key: sysKey, data: { products, loans, history } })
-        });
-        document.getElementById('syncLabel').innerText = "已儲存";
-        renderAll();
+        document.getElementById('syncLabel').innerText = "⏳ 儲存中...";
+        try {
+            await fetch(API_URL, {
+                method: 'POST',
+                mode: 'no-cors',
+                body: JSON.stringify({ key: "1225", data: { products, loans, history } })
+            });
+            document.getElementById('syncLabel').innerText = "✅ 儲存成功";
+            renderAll();
+        } catch (e) { alert("儲存失敗"); }
     }
 
     function renderAll() {
         // 渲染建檔
-        const sBody = document.querySelector("#setupTable tbody");
-        if(sBody) sBody.innerHTML = products.map(p => `<tr><td>${p.name}</td><td>${p.total}</td><td>${p.loc || ''}</td><td><button class="btn btn-del" onclick="deleteProduct(${p.id})">刪除</button></td></tr>`).join('');
-
-        // 渲染總表 (含移倉功能)
-        const fBody = document.querySelector("#fullTable tbody");
-        if(fBody) fBody.innerHTML = products.map(p => `<tr><td>${p.name}</td><td>${p.total}/${p.available}</td><td><span class="location-badge">${p.loc || '未定'}</span></td><td><button class="btn btn-action" onclick="moveLocation(${p.id})" style="padding:4px 8px; font-size:0.8rem">📦 搬移</button></td></tr>`).join('');
-
+        document.querySelector("#setupTable tbody").innerHTML = products.map(p => `<tr><td>${p.name}</td><td>${p.total}</td><td>${p.loc||''}</td><td><button class="btn btn-action" style="background:#e74c3c" onclick="deleteProduct(${p.id})">刪除</button></td></tr>`).join('');
+        // 渲染總表 (含移倉)
+        document.querySelector("#fullTable tbody").innerHTML = products.map(p => `<tr><td>${p.name}</td><td>${p.available} / ${p.total}</td><td>${p.loc||'未定'}</td><td><button class="btn btn-action" onclick="moveLocation(${p.id})">移倉</button></td></tr>`).join('');
         // 渲染歸還
-        const lBody = document.querySelector("#loanTable tbody");
-        if(lBody) lBody.innerHTML = loans.map(l => `<tr><td>${l.user}</td><td>${l.pname}</td><td>${l.qty}</td><td><button class="btn btn-action" onclick="returnItem(${l.id})">歸還</button></td></tr>`).join('');
-
+        document.querySelector("#loanTable tbody").innerHTML = loans.map(l => `<tr><td>${l.user}</td><td>${l.pname}</td><td>${l.qty}</td><td><button class="btn btn-action" onclick="returnItem(${l.id})">歸還</button></td></tr>`).join('');
         // 渲染紀錄
-        const hBody = document.querySelector("#historyTable tbody");
-        if(hBody) hBody.innerHTML = history.map(h => `<tr class="${h.new === '已刪除' ? 'history-del' : ''}"><td>${h.time}</td><td>${h.name}</td><td>${
+        document.querySelector("#historyTable tbody").innerHTML = history.map(h => `<tr><td>${h.time}</td><td>${h.name}</td><td>${h.old}→${h.new}</td><td>${h.reason}</td></tr>`).join('');
+        // 渲染盤點
+        document.querySelector("#stocktakeTable tbody").innerHTML = products.map(p => `<tr><td>${p.name}</td><td>${p.total}</td><td><button class="btn btn-action" onclick="adjust(${p.id})">盤點</button></td></tr>`).join('');
+        // 更新購物車清單
+        document.getElementById('cartProductSelect').innerHTML = products.map(p => `<option value="${p.id}">${p.name} (剩:${p.available})</option>`).join('');
+    }
+
+    function addProduct() {
+        const name = document.getElementById('pName').value.trim();
+        const qty = parseInt(document.getElementById('pQty').value);
+        if(!name || isNaN(qty)) return alert("請填寫");
+        products.push({ id: Date.now(), name, total: qty, available: qty, loc: document.getElementById('pLoc').value });
+        save();
+        document.getElementById('pName').value = ''; document.getElementById('pQty').value = '';
+    }
+
+    function moveLocation(pid) {
+        const p = products.find(i => i.id == pid);
+        const nl = prompt("新倉位：", p.loc);
+        if (nl !== null) { p.loc = nl; save(); }
+    }
+
+    function addToCart() {
+        const pid = document.getElementById('cartProductSelect').value;
+        const qty = parseInt(document.getElementById('cartQty').value);
+        const p = products.find(i => i.id == pid);
+        if(p && p.available >= qty) {
+            cart.push({ pid: p.id, pname: p.name, qty: qty });
+            renderCart();
+        } else alert("庫存不足");
+    }
+
+    function renderCart() {
+        document.querySelector("#cartTable tbody").innerHTML = cart.map((c, i) => `<tr><td>${c.pname}</td><td>${c.qty}</td><td><button class="btn btn-action" style="background:#e74c3c" onclick="cart.splice(${i},1);renderCart();">移除</button></td></tr>`).join('');
+    }
+
+    function checkoutCart() {
+        const u = document.getElementById('loanUser').value;
+        if(!u || cart.length === 0) return alert("資料不全");
+        cart.forEach(c => {
+            const p = products.find(i => i.id == c.pid);
+            p.available -= c.qty;
+            loans.push({ id: Date.now()+Math.random(), pid: p.id, pname: p.name, user: u, qty: c.qty });
+        });
+        cart = []; document.getElementById('loanUser').value = ""; renderCart(); save();
+    }
+
+    function returnItem(lid) {
+        const l = loans.find(i => i.id == lid);
+        const p = products.find(i => i.id == l.pid);
+        if(p) p.available += l.qty;
+        loans = loans.filter(i => i.id !== lid);
+        save();
+    }
+
+    function deleteProduct(id) {
+        if(prompt("請輸入 1225 確認刪除") === "1225") {
+            products = products.filter(i => i.id !== id);
+            save();
+        }
+    }
+
+    function adjust(id) {
+        const v = prompt("實盤數量：");
+        if(v !== null) {
+            const p = products.find(i => i.id == id);
+            p.total = parseInt(v); p.available = parseInt(v);
+            save();
+        }
+    }
+
+    function exportToCSV() {
+        let csv = "\ufeff品名,總數,可用,倉位\n" + products.map(p => `${p.name},${p.total},${p.available},${p.loc||''}`).join('\n');
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'}));
+        link.download = "庫存盤點表.csv"; link.click();
+    }
+
+    function showPage(id) {
+        document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+        document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+        document.getElementById('btn-' + id).classList.add('active');
+    }
+</script>
+</body>
+</html>
