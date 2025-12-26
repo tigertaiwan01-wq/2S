@@ -3,260 +3,216 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>雲端同步庫存系統 - v6.0</title>
+    <title>專業庫存安全系統 v9.0</title>
     <style>
-        :root { --primary: #2c3e50; --accent: #3498db; --success: #27ae60; --danger: #e74c3c; --warning: #f39c12; --history: #9b59b6; }
+        :root { --primary: #2c3e50; --accent: #3498db; --success: #27ae60; --danger: #e74c3c; --warning: #f39c12; }
         body { font-family: "Microsoft JhengHei", sans-serif; background: #f4f7f6; margin: 0; padding: 0; }
-        
-        nav { background: var(--primary); color: white; display: flex; justify-content: center; padding: 15px; gap: 8px; position: sticky; top: 0; z-index: 100; flex-wrap: wrap; }
-        nav button { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.3); color: white; padding: 10px 15px; cursor: pointer; border-radius: 5px; }
-        nav button.active { background: var(--accent); border-color: var(--accent); font-weight: bold; }
-
-        .container { max-width: 1100px; margin: 20px auto; padding: 20px; }
-        .page { display: none; background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        nav { background: var(--primary); color: white; display: flex; justify-content: center; padding: 10px; gap: 5px; position: sticky; top: 0; z-index: 100; flex-wrap: wrap; }
+        nav button { background: rgba(255,255,255,0.1); border: none; color: white; padding: 10px; cursor: pointer; border-radius: 5px; font-size: 0.9rem; }
+        nav button.active { background: var(--accent); font-weight: bold; }
+        .container { max-width: 1000px; margin: 15px auto; padding: 15px; }
+        .page { display: none; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
         .page.active { display: block; }
-        
-        .sync-status { text-align: center; font-size: 12px; padding: 5px; background: #eee; color: #666; }
-
-        h2 { margin-top: 0; color: var(--primary); border-left: 5px solid var(--accent); padding-left: 15px; margin-bottom: 20px; }
-        .input-group { display: flex; gap: 10px; margin-bottom: 20px; flex-wrap: wrap; }
-        input, select { padding: 10px; border: 1px solid #ddd; border-radius: 6px; flex: 1; min-width: 150px; }
-        
-        button.btn { padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; color: white; }
+        .sync-status { text-align: center; font-size: 11px; padding: 5px; background: #eee; color: #666; }
+        .input-group { display: flex; gap: 8px; margin-bottom: 15px; flex-wrap: wrap; }
+        input, select { padding: 8px; border: 1px solid #ddd; border-radius: 5px; flex: 1; min-width: 120px; }
+        button.btn { padding: 8px 15px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; color: white; }
         .btn-add { background: var(--success); }
         .btn-action { background: var(--accent); }
-        .btn-del { background: var(--danger); }
-        .btn-export { background: #673ab7; margin-bottom: 15px; }
-
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th, td { border-bottom: 1px solid #eee; padding: 12px; text-align: left; }
-        th { background: #fafafa; color: #666; font-size: 0.9rem; }
-        
-        .search-bar { width: 100%; padding: 12px; font-size: 1rem; border: 2px solid var(--accent); border-radius: 8px; margin-bottom: 20px; box-sizing: border-box; }
-        .badge-loan { background: var(--warning); color: white; padding: 2px 8px; border-radius: 4px; font-size: 0.85rem; }
-        .diff-pos { color: var(--success); font-weight: bold; }
-        .diff-neg { color: var(--danger); font-weight: bold; }
-        .date-tag { font-size: 0.8rem; color: #95a5a6; font-family: monospace; }
-        
-        /* 載入中動畫 */
-        .loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.8); display: none; justify-content: center; align-items: center; z-index: 1000; }
+        .btn-del { background: var(--danger); font-size: 0.8rem; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9rem; }
+        th, td { border-bottom: 1px solid #eee; padding: 10px; text-align: left; }
+        .reason-tag { color: #888; font-style: italic; font-size: 0.8rem; }
+        #authOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--primary); color: white; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 2000; }
+        .history-del { background-color: #fff5f5; color: var(--danger); font-weight: bold; }
     </style>
 </head>
 <body>
 
-<div id="loader" class="loading-overlay">資料同步中...</div>
-<div class="sync-status" id="syncLabel">雲端狀態：就緒</div>
+<div id="authOverlay">
+    <h2>🔒 系統鎖定</h2>
+    <input type="password" id="sysKeyInput" style="flex:none; width: 180px; margin-bottom: 15px; text-align: center;" placeholder="輸入金鑰">
+    <button class="btn btn-action" onclick="initSystem()">解鎖進入</button>
+</div>
+
+<div class="sync-status" id="syncLabel">狀態：等待解鎖</div>
 
 <nav>
-    <button onclick="showPage('p1')" id="btn-p1" class="active">📦 建檔</button>
-    <button onclick="showPage('p2')" id="btn-p2">📊 總表</button>
-    <button onclick="showPage('p3')" id="btn-p3">📤 外借/歸還</button>
-    <button onclick="showPage('p4')" id="btn-p4">🔍 盤點修正</button>
-    <button onclick="showPage('p5')" id="btn-p5">📜 歷史紀錄</button>
+    <button onclick="showPage('p1')" id="btn-p1" class="active">🆕 建檔</button>
+    <button onclick="showPage('p2')" id="btn-p2">📋 總表</button>
+    <button onclick="showPage('p3')" id="btn-p3">📤 外借</button>
+    <button onclick="showPage('p4')" id="btn-p4">🔧 盤點</button>
+    <button onclick="showPage('p5')" id="btn-p5">📜 紀錄</button>
 </nav>
 
 <div class="container">
     <div id="p1" class="page active">
-        <h2>商品建檔管理</h2>
+        <h3>新增品項</h3>
         <div class="input-group">
             <input type="text" id="pName" placeholder="名稱">
             <input type="number" id="pQty" placeholder="數量">
             <input type="text" id="pNote" placeholder="備註">
             <button class="btn btn-add" onclick="addProduct()">確認新增</button>
         </div>
-        <table id="setupTable"><thead><tr><th>名稱</th><th>總庫存</th><th>備註</th><th>管理</th></tr></thead><tbody></tbody></table>
+        <table id="setupTable"><thead><tr><th>名稱</th><th>庫存</th><th>管理</th></tr></thead><tbody></tbody></table>
     </div>
 
     <div id="p2" class="page">
-        <h2>庫存總表</h2>
-        <button class="btn btn-export" onclick="exportToCSV()">📂 匯出本地備份 (CSV)</button>
-        <input type="text" id="searchInput" class="search-bar" placeholder="🔍 搜尋名稱、備註、借用人..." onkeyup="renderAll()">
-        <table id="fullTable">
-            <thead><tr><th>名稱</th><th>總數/可用</th><th>狀態</th><th>備註</th><th>最後盤點日</th></tr></thead>
-            <tbody></tbody>
-        </table>
+        <h3>庫存總表</h3>
+        <table id="fullTable"><thead><tr><th>名稱</th><th>總數/剩餘</th><th>備註</th><th>更新時間</th></tr></thead><tbody></tbody></table>
     </div>
 
     <div id="p3" class="page">
-        <h2>辦理外借</h2>
-        <div class="input-group" style="background: #eef2f3; padding: 15px; border-radius: 8px;">
+        <h3>外借/歸還</h3>
+        <div class="input-group">
             <select id="loanProductSelect"></select>
             <input type="text" id="loanUser" placeholder="借用人">
-            <button class="btn btn-action" onclick="createLoan()">執行外借</button>
+            <button class="btn btn-action" onclick="createLoan()">執行</button>
         </div>
-        <h3>借出明細</h3>
-        <table id="loanTable"><thead><tr><th>借用人</th><th>物品</th><th>操作</th></tr></thead><tbody></tbody></table>
+        <table id="loanTable"><thead><tr><th>借用人</th><th>物品</th><th>管理</th></tr></thead><tbody></tbody></table>
     </div>
 
     <div id="p4" class="page">
-        <h2>年度盤點</h2>
-        <table id="stocktakeTable">
-            <thead><tr><th>名稱</th><th>帳面數</th><th>上次盤點</th><th>操作</th></tr></thead>
-            <tbody></tbody>
-        </table>
+        <h3>盤點修正</h3>
+        <table id="stocktakeTable"><thead><tr><th>名稱</th><th>目前數</th><th>操作</th></tr></thead><tbody></tbody></table>
     </div>
 
     <div id="p5" class="page">
-        <h2>盤點更動歷史紀錄</h2>
-        <table id="historyTable">
-            <thead><tr><th>變動時間</th><th>品項名稱</th><th>舊數量</th><th>新數量</th><th>差異</th></tr></thead>
-            <tbody></tbody>
-        </table>
+        <h3>異動紀錄</h3>
+        <table id="historyTable"><thead><tr><th>時間</th><th>品項</th><th>變動</th><th>原因</th></tr></thead><tbody></tbody></table>
     </div>
 </div>
 
 <script>
-    // 配置 Google Apps Script 網址
-    const API_URL = "https://script.google.com/macros/s/AKfycby8_A83yTV5Q7MHWtnmYWdgPj_ySmO_j4wEOrUDMuCvDYkWnQdFPk4jvcUywaeKCeMbEQ/exec";
+    // ⚠️ 請確保 API_URL 是最新的
+    const API_URL = "https://script.google.com/macros/s/AKfycbzJOaPq_CJ8Zwb47JCLGMTNn-O0KtW-Jx68JwZ3UC7UD-WJg4RfcpokbpjXVjqP-_Sjgw/exec"; 
+    let sysKey = "";
+    let products = [], loans = [], history = [];
 
-    let products = JSON.parse(localStorage.getItem('cloud_inv_data')) || [];
-    let loans = JSON.parse(localStorage.getItem('cloud_inv_loans')) || [];
-    let history = JSON.parse(localStorage.getItem('cloud_inv_history')) || [];
-
-    // --- 雲端同步邏輯 ---
+    function initSystem() {
+        sysKey = document.getElementById('sysKeyInput').value;
+        if(sysKey === "1225") {
+            document.getElementById('authOverlay').style.display = 'none';
+            syncFromCloud();
+        } else {
+            alert("金鑰錯誤！");
+        }
+    }
 
     async function syncFromCloud() {
-        document.getElementById('loader').style.display = 'flex';
-        document.getElementById('syncLabel').innerText = "雲端狀態：正在同步...";
+        document.getElementById('syncLabel').innerText = "狀態：雲端同步中...";
         try {
-            const response = await fetch(API_URL);
-            const data = await response.json();
-            if (data && data.products) {
-                products = data.products;
-                loans = data.loans || [];
-                history = data.history || [];
-                updateLocalStorage();
-                document.getElementById('syncLabel').innerText = "雲端狀態：已與 Google 同步";
-            }
+            const res = await fetch(`${API_URL}?key=${sysKey}`);
+            const data = await res.json();
+            products = data.products || [];
+            loans = data.loans || [];
+            history = data.history || [];
+            renderAll();
+            document.getElementById('syncLabel').innerText = "狀態：同步成功";
         } catch (e) {
-            console.error("同步失敗", e);
-            document.getElementById('syncLabel').innerText = "雲端狀態：同步失敗 (使用本地快取)";
+            document.getElementById('syncLabel').innerText = "狀態：連線失敗";
         }
-        document.getElementById('loader').style.display = 'none';
-        renderAll();
     }
 
     async function save() {
-        updateLocalStorage();
-        renderAll();
-        document.getElementById('syncLabel').innerText = "雲端狀態：正在儲存...";
+        document.getElementById('syncLabel').innerText = "狀態：同步雲端中...";
         try {
             await fetch(API_URL, {
                 method: 'POST',
-                mode: 'no-cors', // 解決跨域問題
-                body: JSON.stringify({ products, loans, history })
+                mode: 'no-cors',
+                body: JSON.stringify({ key: sysKey, data: { products, loans, history } })
             });
-            document.getElementById('syncLabel').innerText = "雲端狀態：儲存成功";
+            document.getElementById('syncLabel').innerText = "狀態：儲存成功";
         } catch (e) {
-            document.getElementById('syncLabel').innerText = "雲端狀態：儲存失敗 (僅存於本地)";
+            document.getElementById('syncLabel').innerText = "狀態：儲存失敗";
+        }
+        renderAll();
+    }
+
+    function renderAll() {
+        const sBody = document.querySelector("#setupTable tbody");
+        if(sBody) sBody.innerHTML = products.map(p => `<tr><td>${p.name}</td><td>${p.total}</td><td><button class="btn btn-del" onclick="deleteProduct(${p.id})">刪除</button></td></tr>`).join('');
+
+        const fBody = document.querySelector("#fullTable tbody");
+        if(fBody) fBody.innerHTML = products.map(p => `<tr><td>${p.name}</td><td>${p.total} / ${p.available}</td><td>${p.note || ''}</td><td>${p.lastDate || '---'}</td></tr>`).join('');
+
+        const lBody = document.querySelector("#loanTable tbody");
+        if(lBody) lBody.innerHTML = loans.map(l => `<tr><td>${l.user}</td><td>${l.pname}</td><td><button class="btn btn-action" onclick="returnItem(${l.id})">歸還</button></td></tr>`).join('');
+
+        const tBody = document.querySelector("#stocktakeTable tbody");
+        if(tBody) tBody.innerHTML = products.map(p => `<tr><td>${p.name}</td><td>${p.total}</td><td><button class="btn btn-action" onclick="adjust(${p.id})">修正</button></td></tr>`).join('');
+
+        const hBody = document.querySelector("#historyTable tbody");
+        if(hBody) hBody.innerHTML = history.map(h => `
+            <tr class="${h.new === '已刪除' ? 'history-del' : ''}">
+                <td>${h.time}</td>
+                <td>${h.name}</td>
+                <td>${h.old} → ${h.new}</td>
+                <td class="reason-tag">${h.reason}</td>
+            </tr>`).join('');
+
+        const sel = document.getElementById('loanProductSelect');
+        if(sel) sel.innerHTML = products.map(p => `<option value="${p.id}">${p.name} (剩:${p.available})</option>`).join('');
+    }
+
+    function addProduct() {
+        const name = document.getElementById('pName').value.trim();
+        const qty = parseInt(document.getElementById('pQty').value);
+        if(!name || isNaN(qty)) return alert("請填寫正確資料");
+        products.push({ id: Date.now(), name, total: qty, available: qty, note: document.getElementById('pNote').value, lastDate: '---' });
+        save();
+        document.getElementById('pName').value = ''; document.getElementById('pQty').value = ''; document.getElementById('pNote').value = '';
+    }
+
+    function deleteProduct(id) {
+        const p = products.find(i => i.id == id);
+        const check = prompt(`確定刪除「${p.name}」？此動作會被紀錄。\n請輸入金鑰確認：`);
+        if (check === sysKey) {
+            const now = new Date().toLocaleString('zh-TW', {hour12:false}).slice(5,16);
+            history.unshift({ time: now, name: p.name, old: p.total, new: "已刪除", reason: "⚠️ 管理員執行刪除" });
+            products = products.filter(i => i.id !== id);
+            save();
+        } else if (check !== null) alert("金鑰錯誤");
+    }
+
+    function createLoan() {
+        const pid = document.getElementById('loanProductSelect').value;
+        const user = document.getElementById('loanUser').value.trim();
+        const p = products.find(i => i.id == pid);
+        if(p && p.available > 0 && user) {
+            p.available--;
+            loans.push({ id: Date.now(), pid: p.id, pname: p.name, user });
+            save();
+            document.getElementById('loanUser').value = '';
         }
     }
 
-    function updateLocalStorage() {
-        localStorage.setItem('cloud_inv_data', JSON.stringify(products));
-        localStorage.setItem('cloud_inv_loans', JSON.stringify(loans));
-        localStorage.setItem('cloud_inv_history', JSON.stringify(history));
+    function returnItem(lid) {
+        const l = loans.find(i => i.id == lid);
+        const p = products.find(i => i.id == l.pid);
+        if(p) p.available++;
+        loans = loans.filter(i => i.id !== lid);
+        save();
     }
 
-    // --- 介面邏輯 ---
+    function adjust(id) {
+        const newVal = prompt("實盤數量：");
+        if(newVal !== null && newVal !== "") {
+            const reason = prompt("事由 (如:損壞)：") || "盤點修正";
+            const p = products.find(i => i.id == id);
+            const now = new Date().toLocaleString('zh-TW', {hour12:false}).slice(5,16);
+            history.unshift({ time: now, name: p.name, old: p.total, new: parseInt(newVal), reason: reason });
+            p.total = parseInt(newVal); p.available = parseInt(newVal); p.lastDate = now;
+            save();
+        }
+    }
 
     function showPage(id) {
         document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
         document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
         document.getElementById(id).classList.add('active');
         document.getElementById('btn-' + id).classList.add('active');
-        renderAll();
     }
-
-    function addProduct() {
-        const name = document.getElementById('pName').value;
-        const qty = parseInt(document.getElementById('pQty').value);
-        const note = document.getElementById('pNote').value;
-        if(!name || isNaN(qty)) return alert("請輸入完整資料");
-        products.push({ id: Date.now(), name, total: qty, available: qty, note, lastDate: '---' });
-        save();
-        document.getElementById('pName').value = ''; document.getElementById('pQty').value = ''; document.getElementById('pNote').value = '';
-    }
-
-    function deleteProduct(id) {
-        if(prompt("請輸入 8888 以確認刪除品項：") === "8888") {
-            products = products.filter(p => p.id !== id);
-            loans = loans.filter(l => l.pid !== id);
-            save();
-        }
-    }
-
-    function adjust(id) {
-        const newVal = prompt("請輸入實盤總數量：");
-        if(newVal !== null && newVal !== "") {
-            const product = products.find(p => p.id == id);
-            const oldQty = product.total;
-            const newQty = parseInt(newVal);
-            const diff = newQty - oldQty;
-            const now = new Date().toLocaleString();
-
-            history.unshift({ time: now, name: product.name, old: oldQty, new: newQty, diff: diff });
-            product.total = newQty;
-            product.available = newQty; 
-            product.lastDate = now.split(' ')[0];
-            save();
-        }
-    }
-
-    function createLoan() {
-        const pid = document.getElementById('loanProductSelect').value;
-        const user = document.getElementById('loanUser').value;
-        const product = products.find(p => p.id == pid);
-        if(product && product.available > 0 && user) {
-            product.available--;
-            loans.push({ id: Date.now(), pid: product.id, pname: product.name, user });
-            save();
-            document.getElementById('loanUser').value = '';
-        } else {
-            alert("庫存不足或未填寫借用人");
-        }
-    }
-
-    function returnItem(lid) {
-        const loan = loans.find(l => l.id == lid);
-        const product = products.find(p => p.id == loan.pid);
-        if(product) product.available++;
-        loans = loans.filter(l => l.id !== lid);
-        save();
-    }
-
-    function renderAll() {
-        const s = document.getElementById('searchInput').value.toLowerCase();
-
-        document.querySelector("#setupTable tbody").innerHTML = products.map(p => `<tr><td>${p.name}</td><td>${p.total}</td><td>${p.note}</td><td><button class="btn btn-del" onclick="deleteProduct(${p.id})">刪除</button></td></tr>`).join('');
-
-        document.querySelector("#fullTable tbody").innerHTML = products.filter(p => p.name.toLowerCase().includes(s) || p.note.toLowerCase().includes(s)).map(p => {
-            const curL = loans.filter(l => l.pid === p.id);
-            return `<tr><td><strong>${p.name}</strong></td><td>${p.total} / <span style="color:blue">${p.available}</span></td><td>${curL.length > 0 ? '<span class="badge-loan">借出中</span>' : '在庫'}</td><td>${p.note}</td><td class="date-tag">${p.lastDate}</td></tr>`;
-        }).join('');
-
-        document.getElementById("loanProductSelect").innerHTML = products.map(p => `<option value="${p.id}">${p.name} (剩:${p.available})</option>`).join('');
-        document.querySelector("#loanTable tbody").innerHTML = loans.map(l => `<tr><td>${l.user}</td><td>${l.pname}</td><td><button class="btn btn-action" onclick="returnItem(${l.id})">歸還</button></td></tr>`).join('');
-        document.querySelector("#stocktakeTable tbody").innerHTML = products.map(p => `<tr><td>${p.name}</td><td>${p.total}</td><td class="date-tag">${p.lastDate}</td><td><button class="btn btn-action" onclick="adjust(${p.id})">盤點修正</button></td></tr>`).join('');
-
-        document.querySelector("#historyTable tbody").innerHTML = history.map(h => `
-            <tr><td class="date-tag">${h.time}</td><td>${h.name}</td><td>${h.old}</td><td>${h.new}</td>
-            <td class="${h.diff > 0 ? 'diff-pos' : 'diff-neg'}">${h.diff > 0 ? '+' + h.diff : h.diff}</td></tr>
-        `).join('');
-    }
-
-    function exportToCSV() {
-        let csv = "\ufeff名稱,總數,可用數,備註,最後盤點日\n";
-        products.forEach(p => csv += `${p.name},${p.total},${p.available},${p.note},${p.lastDate}\n`);
-        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-        const link = document.createElement("a");
-        link.href = URL.createObjectURL(blob);
-        link.download = `本地備份_${new Date().toLocaleDateString()}.csv`;
-        link.click();
-    }
-
-    // 啟動時同步
-    window.onload = syncFromCloud;
 </script>
 </body>
 </html>
