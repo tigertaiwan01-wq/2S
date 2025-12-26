@@ -3,22 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>專業庫存安全系統 v14.0</title>
+    <title>專業庫存安全系統 v11.5 - 購物車+移倉版</title>
     <style>
-        :root { --primary: #2c3e50; --accent: #3498db; --success: #27ae60; --danger: #e74c3c; }
+        :root { --primary: #2c3e50; --accent: #3498db; --success: #27ae60; --danger: #e74c3c; --warning: #f39c12; }
         body { font-family: "Microsoft JhengHei", sans-serif; background: #f4f7f6; margin: 0; padding: 0; }
-        nav { background: var(--primary); color: white; display: flex; justify-content: center; padding: 10px; gap: 5px; position: sticky; top: 0; z-index: 100; }
-        nav button { background: rgba(255,255,255,0.1); border: none; color: white; padding: 10px; cursor: pointer; border-radius: 5px; }
+        nav { background: var(--primary); color: white; display: flex; justify-content: center; padding: 10px; gap: 5px; position: sticky; top: 0; z-index: 100; flex-wrap: wrap; }
+        nav button { background: rgba(255,255,255,0.1); border: none; color: white; padding: 10px; cursor: pointer; border-radius: 5px; font-size: 0.9rem; }
         nav button.active { background: var(--accent); font-weight: bold; }
         .container { max-width: 1100px; margin: 15px auto; padding: 15px; }
         .page { display: none; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
         .page.active { display: block; }
         .sync-status { text-align: center; font-size: 11px; padding: 5px; background: #eee; color: #666; }
-        .input-group { display: flex; gap: 8px; margin-bottom: 15px; flex-wrap: wrap; }
-        input, select { padding: 8px; border: 1px solid #ddd; border-radius: 5px; flex: 1; }
+        .input-group { display: flex; gap: 8px; margin-bottom: 15px; flex-wrap: wrap; align-items: center; }
+        input, select { padding: 8px; border: 1px solid #ddd; border-radius: 5px; flex: 1; min-width: 120px; }
         button.btn { padding: 8px 15px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; color: white; }
         .btn-add { background: var(--success); }
         .btn-action { background: var(--accent); }
+        .btn-del { background: var(--danger); font-size: 0.8rem; }
+        .btn-export { background: #607d8b; margin-bottom: 10px; }
+        .cart-section { border: 2px dashed var(--accent); padding: 15px; border-radius: 10px; margin-bottom: 20px; background: #f0f7ff; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 0.9rem; }
+        th, td { border-bottom: 1px solid #eee; padding: 10px; text-align: left; }
+        .location-badge { background: #eee; padding: 2px 6px; border-radius: 4px; font-size: 0.75rem; color: #555; font-weight: bold; }
         #authOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--primary); color: white; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 2000; }
     </style>
 </head>
@@ -26,12 +32,11 @@
 
 <div id="authOverlay">
     <h2>🔒 系統鎖定</h2>
-    <p id="msg" style="color:#f39c12; font-size:0.9rem">請輸入系統金鑰以進行連線</p>
-    <input type="password" id="sysKeyInput" style="flex:none; width: 200px; margin-bottom: 15px; text-align: center;" placeholder="輸入 1225">
+    <input type="password" id="sysKeyInput" style="flex:none; width: 180px; margin-bottom: 15px; text-align: center;" placeholder="輸入金鑰">
     <button class="btn btn-action" onclick="initSystem()">解鎖進入</button>
 </div>
 
-<div class="sync-status" id="syncLabel">狀態：等待驗證</div>
+<div class="sync-status" id="syncLabel">狀態：等待解鎖</div>
 
 <nav>
     <button onclick="showPage('p1')" id="btn-p1" class="active">🆕 建檔</button>
@@ -48,158 +53,220 @@
             <input type="text" id="pName" placeholder="名稱">
             <input type="number" id="pQty" placeholder="數量">
             <input type="text" id="pLoc" placeholder="倉位">
+            <input type="text" id="pNote" placeholder="備註">
             <button class="btn btn-add" onclick="addProduct()">確認新增</button>
         </div>
         <table id="setupTable"><thead><tr><th>名稱</th><th>庫存</th><th>倉位</th><th>管理</th></tr></thead><tbody></tbody></table>
     </div>
-    <div id="p2" class="page"><h3>庫存總表</h3><button class="btn btn-action" onclick="exportToCSV()">📊 匯出</button><table id="fullTable"><thead><tr><th>名稱</th><th>剩餘</th><th>倉位</th><th>操作</th></tr></thead><tbody></tbody></table></div>
+
+    <div id="p2" class="page">
+        <h3>庫存總表</h3>
+        <button class="btn btn-export" onclick="exportToCSV()">📊 匯出目前的盤點 Excel 檔</button>
+        <table id="fullTable"><thead><tr><th>名稱</th><th>總數 / 剩餘</th><th>倉位</th><th>操作</th><th>備註</th></tr></thead><tbody></tbody></table>
+    </div>
+
     <div id="p3" class="page">
-        <h3>🛒 購物車外借</h3>
-        <div style="background:#f0f7ff; padding:15px; border-radius:10px; margin-bottom:20px; border:1px dashed #3498db;">
+        <h3>🛒 外借購物車系統</h3>
+        <div class="cart-section">
+            <h4>第一步：挑選物品加入清單</h4>
             <div class="input-group">
                 <select id="cartProductSelect"></select>
-                <input type="number" id="cartQty" value="1" min="1" style="width:60px; flex:none;">
-                <button class="btn btn-add" onclick="addToCart()">➕ 加入</button>
+                <input type="number" id="cartQty" value="1" min="1" style="width: 60px; flex: none;">
+                <button class="btn btn-add" onclick="addToCart()">➕ 加入清單</button>
             </div>
-            <table id="cartTable"><thead><tr><th>品項</th><th>數量</th><th>操作</th></tr></thead><tbody></tbody></table>
-            <input type="text" id="loanUser" placeholder="借用人" style="margin-top:10px; width:100%">
-            <button class="btn btn-action" onclick="checkoutCart()" style="width:100%; margin-top:10px;">🚀 批次借出</button>
+            <table id="cartTable">
+                <thead><tr><th>品項</th><th>數量</th><th>移除</th></tr></thead>
+                <tbody></tbody>
+            </table>
+            <hr>
+            <h4>第二步：填寫借用人並批次借出</h4>
+            <div class="input-group">
+                <input type="text" id="loanUser" placeholder="輸入借用人姓名">
+                <button class="btn btn-action" onclick="checkoutCart()" style="flex: 2;">🚀 確認批次借出</button>
+            </div>
         </div>
+        <h3>目前已借出清單 (歸還區)</h3>
         <table id="loanTable"><thead><tr><th>借用人</th><th>物品</th><th>數量</th><th>操作</th></tr></thead><tbody></tbody></table>
     </div>
-    <div id="p4" class="page"><h3>盤點修正</h3><table id="stocktakeTable"><thead><tr><th>名稱</th><th>帳面數</th><th>操作</th></tr></thead><tbody></tbody></table></div>
-    <div id="p5" class="page"><h3>異動紀錄</h3><table id="historyTable"><thead><tr><th>時間</th><th>品項</th><th>變動</th><th>原因</th></tr></thead><tbody></tbody></table></div>
+
+    <div id="p4" class="page">
+        <h3>年度盤點修正</h3>
+        <table id="stocktakeTable"><thead><tr><th>名稱</th><th>倉位</th><th>帳面數</th><th>操作</th></tr></thead><tbody></tbody></table>
+    </div>
+
+    <div id="p5" class="page">
+        <h3>異動紀錄</h3>
+        <table id="historyTable"><thead><tr><th>時間</th><th>品項</th><th>變動</th><th>原因</th></tr></thead><tbody></tbody></table>
+    </div>
 </div>
 
 <script>
-    // -------------------------------------------------------------------------
-    // ⚠️ 請確保這裡填入正確的網址，且該網址在瀏覽器直接打開能看到 {"error":"金鑰錯誤"}
-    const API_URL = "https://script.google.com/macros/s/AKfycbxhEJ7nGzQSm2VzkO34EWFMxYyWisfbQ24DF67tN7tEWOZHenpEMKACdtG9SmGWO4aaSA/exec"; 
-    // -------------------------------------------------------------------------
+    const API_URL = "https://script.google.com/macros/s/AKfycbxlYYhohiIkkXMyI7hYCiare53-NEiWRwkXrNSoN_iZqtMwcr4QiAgxIgVwCaODCyw_ZA/exec"; 
+    let sysKey = "";
+    let products = [], loans = [], history = [];
+    let cart = [];
 
-    let products = [], loans = [], history = [], cart = [];
+    function initSystem() {
+        sysKey = document.getElementById('sysKeyInput').value;
+        if(sysKey === "1225") {
+            document.getElementById('authOverlay').style.display = 'none';
+            syncFromCloud();
+        } else { alert("金鑰錯誤！"); }
+    }
 
-    async function initSystem() {
-        const key = document.getElementById('sysKeyInput').value;
-        if (key !== "1225") return alert("金鑰錯誤！");
-
-        document.getElementById('msg').innerText = "📡 正在連線雲端資料庫，請稍候...";
-        
+    async function syncFromCloud() {
+        document.getElementById('syncLabel').innerText = "狀態：雲端同步中...";
         try {
-            const res = await fetch(`${API_URL}?key=1225`);
-            if (!res.ok) throw new Error("API 網址回應異常");
+            const res = await fetch(`${API_URL}?key=${sysKey}`);
             const data = await res.json();
-            
             products = data.products || [];
             loans = data.loans || [];
             history = data.history || [];
-            
-            document.getElementById('authOverlay').style.display = 'none';
-            document.getElementById('syncLabel').innerText = "✅ 同步成功";
             renderAll();
-        } catch (e) {
-            document.getElementById('msg').innerText = "❌ 連線失敗！請檢查 API_URL 是否填寫正確。";
-            alert("錯誤細節：" + e.message + "\n\n1. 請確認 API_URL 已正確填寫。\n2. 請確認 Google Script 已部署為 'Anyone'。");
-        }
+            document.getElementById('syncLabel').innerText = "狀態：已與雲端同步";
+        } catch (e) { document.getElementById('syncLabel').innerText = "狀態：同步失敗"; }
     }
 
     async function save() {
-        document.getElementById('syncLabel').innerText = "⏳ 儲存中...";
+        document.getElementById('syncLabel').innerText = "狀態：雲端儲存中...";
         try {
             await fetch(API_URL, {
                 method: 'POST',
                 mode: 'no-cors',
-                body: JSON.stringify({ key: "1225", data: { products, loans, history } })
+                body: JSON.stringify({ key: sysKey, data: { products, loans, history } })
             });
-            document.getElementById('syncLabel').innerText = "✅ 儲存成功";
-            renderAll();
-        } catch (e) { alert("儲存失敗"); }
+            document.getElementById('syncLabel').innerText = "狀態：儲存成功";
+        } catch (e) { document.getElementById('syncLabel').innerText = "狀態：儲存失敗"; }
+        renderAll();
+    }
+
+    function addToCart() {
+        const pid = document.getElementById('cartProductSelect').value;
+        const qty = parseInt(document.getElementById('cartQty').value) || 1;
+        const p = products.find(i => i.id == pid);
+        if(!p) return;
+        const inCart = cart.find(c => c.pid == pid);
+        const totalNeeded = (inCart ? inCart.qty : 0) + qty;
+        if(totalNeeded > p.available) return alert(`庫存不足！(剩餘可用: ${p.available})`);
+        if(inCart) inCart.qty += qty;
+        else cart.push({ pid: p.id, pname: p.name, qty: qty });
+        renderCart();
+    }
+
+    function removeFromCart(pid) {
+        cart = cart.filter(c => c.pid != pid);
+        renderCart();
+    }
+
+    function renderCart() {
+        const cBody = document.querySelector("#cartTable tbody");
+        cBody.innerHTML = cart.map(c => `<tr><td>${c.pname}</td><td>${c.qty}</td><td><button class="btn btn-del" onclick="removeFromCart(${c.pid})">移除</button></td></tr>`).join('');
+    }
+
+    async function checkoutCart() {
+        const user = document.getElementById('loanUser').value.trim();
+        if(!user) return alert("請輸入借用人！");
+        if(cart.length === 0) return alert("購物車是空的！");
+        cart.forEach(c => {
+            const p = products.find(i => i.id == c.pid);
+            if(p) {
+                p.available -= c.qty;
+                loans.push({ id: Date.now() + Math.random(), pid: p.id, pname: p.name, user: user, qty: c.qty });
+            }
+        });
+        cart = [];
+        document.getElementById('loanUser').value = "";
+        renderCart();
+        save();
+        alert("批次借出成功！");
     }
 
     function renderAll() {
-        // 渲染建檔
-        document.querySelector("#setupTable tbody").innerHTML = products.map(p => `<tr><td>${p.name}</td><td>${p.total}</td><td>${p.loc||''}</td><td><button class="btn btn-action" style="background:#e74c3c" onclick="deleteProduct(${p.id})">刪除</button></td></tr>`).join('');
-        // 渲染總表 (含移倉)
-        document.querySelector("#fullTable tbody").innerHTML = products.map(p => `<tr><td>${p.name}</td><td>${p.available} / ${p.total}</td><td>${p.loc||'未定'}</td><td><button class="btn btn-action" onclick="moveLocation(${p.id})">移倉</button></td></tr>`).join('');
-        // 渲染歸還
-        document.querySelector("#loanTable tbody").innerHTML = loans.map(l => `<tr><td>${l.user}</td><td>${l.pname}</td><td>${l.qty}</td><td><button class="btn btn-action" onclick="returnItem(${l.id})">歸還</button></td></tr>`).join('');
-        // 渲染紀錄
-        document.querySelector("#historyTable tbody").innerHTML = history.map(h => `<tr><td>${h.time}</td><td>${h.name}</td><td>${h.old}→${h.new}</td><td>${h.reason}</td></tr>`).join('');
-        // 渲染盤點
-        document.querySelector("#stocktakeTable tbody").innerHTML = products.map(p => `<tr><td>${p.name}</td><td>${p.total}</td><td><button class="btn btn-action" onclick="adjust(${p.id})">盤點</button></td></tr>`).join('');
-        // 更新購物車清單
-        document.getElementById('cartProductSelect').innerHTML = products.map(p => `<option value="${p.id}">${p.name} (剩:${p.available})</option>`).join('');
+        const sBody = document.querySelector("#setupTable tbody");
+        if(sBody) sBody.innerHTML = products.map(p => `<tr><td>${p.name}</td><td>${p.total}</td><td><span class="location-badge">${p.loc || '未定'}</span></td><td><button class="btn btn-del" onclick="deleteProduct(${p.id})">刪除</button></td></tr>`).join('');
+
+        // 總表：增加一個「移倉」按鈕
+        const fBody = document.querySelector("#fullTable tbody");
+        if(fBody) fBody.innerHTML = products.map(p => `<tr><td>${p.name}</td><td>${p.total} / ${p.available}</td><td><span class="location-badge">${p.loc || '未定'}</span></td><td><button class="btn btn-action" style="padding:4px 8px; font-size:0.8rem;" onclick="moveLocation(${p.id})">移倉</button></td><td>${p.note || ''}</td></tr>`).join('');
+
+        const lBody = document.querySelector("#loanTable tbody");
+        if(lBody) lBody.innerHTML = loans.map(l => `<tr><td>${l.user}</td><td>${l.pname}</td><td>${l.qty || 1}</td><td><button class="btn btn-action" onclick="returnItem(${l.id})">歸還</button></td></tr>`).join('');
+
+        const tBody = document.querySelector("#stocktakeTable tbody");
+        if(tBody) tBody.innerHTML = products.map(p => `<tr><td>${p.name}</td><td>${p.loc || ''}</td><td>${p.total}</td><td><button class="btn btn-action" onclick="adjust(${p.id})">修正</button></td></tr>`).join('');
+
+        const hBody = document.querySelector("#historyTable tbody");
+        if(hBody) hBody.innerHTML = history.map(h => `<tr class="${h.new === '已刪除' ? 'history-del' : ''}"><td>${h.time}</td><td>${h.name}</td><td>${h.old} → ${h.new}</td><td>${h.reason}</td></tr>`).join('');
+
+        const sel = document.getElementById('cartProductSelect');
+        if(sel) sel.innerHTML = products.map(p => `<option value="${p.id}">${p.name} (剩:${p.available})</option>`).join('');
+    }
+
+    // --- 新增：移倉功能 ---
+    function moveLocation(pid) {
+        const p = products.find(i => i.id == pid);
+        if(!p) return;
+        const oldLoc = p.loc || "未定";
+        const newLoc = prompt(`將「${p.name}」搬移到新倉位：`, oldLoc);
+        if (newLoc !== null && newLoc !== oldLoc) {
+            history.unshift({ 
+                time: new Date().toLocaleString(), 
+                name: p.name, 
+                old: `倉位: ${oldLoc}`, 
+                new: `倉位: ${newLoc}`, 
+                reason: "移倉變更" 
+            });
+            p.loc = newLoc;
+            save();
+        }
     }
 
     function addProduct() {
         const name = document.getElementById('pName').value.trim();
         const qty = parseInt(document.getElementById('pQty').value);
-        if(!name || isNaN(qty)) return alert("請填寫");
-        products.push({ id: Date.now(), name, total: qty, available: qty, loc: document.getElementById('pLoc').value });
+        if(!name || isNaN(qty)) return alert("填寫名稱與數量");
+        products.push({ id: Date.now(), name, total: qty, available: qty, loc: document.getElementById('pLoc').value, note: document.getElementById('pNote').value });
         save();
-        document.getElementById('pName').value = ''; document.getElementById('pQty').value = '';
-    }
-
-    function moveLocation(pid) {
-        const p = products.find(i => i.id == pid);
-        const nl = prompt("新倉位：", p.loc);
-        if (nl !== null) { p.loc = nl; save(); }
-    }
-
-    function addToCart() {
-        const pid = document.getElementById('cartProductSelect').value;
-        const qty = parseInt(document.getElementById('cartQty').value);
-        const p = products.find(i => i.id == pid);
-        if(p && p.available >= qty) {
-            cart.push({ pid: p.id, pname: p.name, qty: qty });
-            renderCart();
-        } else alert("庫存不足");
-    }
-
-    function renderCart() {
-        document.querySelector("#cartTable tbody").innerHTML = cart.map((c, i) => `<tr><td>${c.pname}</td><td>${c.qty}</td><td><button class="btn btn-action" style="background:#e74c3c" onclick="cart.splice(${i},1);renderCart();">移除</button></td></tr>`).join('');
-    }
-
-    function checkoutCart() {
-        const u = document.getElementById('loanUser').value;
-        if(!u || cart.length === 0) return alert("資料不全");
-        cart.forEach(c => {
-            const p = products.find(i => i.id == c.pid);
-            p.available -= c.qty;
-            loans.push({ id: Date.now()+Math.random(), pid: p.id, pname: p.name, user: u, qty: c.qty });
-        });
-        cart = []; document.getElementById('loanUser').value = ""; renderCart(); save();
+        document.getElementById('pName').value = ''; document.getElementById('pQty').value = ''; document.getElementById('pLoc').value = '';
     }
 
     function returnItem(lid) {
         const l = loans.find(i => i.id == lid);
-        const p = products.find(i => i.id == l.pid);
-        if(p) p.available += l.qty;
-        loans = loans.filter(i => i.id !== lid);
-        save();
+        if(l) {
+            const p = products.find(i => i.id == l.pid);
+            if(p) p.available += (l.qty || 1);
+            loans = loans.filter(i => i.id !== lid);
+            save();
+        }
     }
 
     function deleteProduct(id) {
-        if(prompt("請輸入 1225 確認刪除") === "1225") {
+        const p = products.find(i => i.id == id);
+        if(prompt(`輸入金鑰確認刪除「${p.name}」`) === "1225") {
+            history.unshift({ time: new Date().toLocaleString(), name: p.name, old: p.total, new: "已刪除", reason: "手動刪除" });
             products = products.filter(i => i.id !== id);
             save();
         }
     }
 
     function adjust(id) {
-        const v = prompt("實盤數量：");
-        if(v !== null) {
+        const newVal = prompt("實盤數量：");
+        if(newVal !== null) {
+            const reason = prompt("事由：") || "盤點修正";
             const p = products.find(i => i.id == id);
-            p.total = parseInt(v); p.available = parseInt(v);
+            history.unshift({ time: new Date().toLocaleString(), name: p.name, old: p.total, new: newVal, reason: reason });
+            p.total = parseInt(newVal); p.available = parseInt(newVal);
             save();
         }
     }
 
     function exportToCSV() {
-        let csv = "\ufeff品名,總數,可用,倉位\n" + products.map(p => `${p.name},${p.total},${p.available},${p.loc||''}`).join('\n');
+        let csv = "\ufeff名稱,倉位,總數,可用,備註\n";
+        products.forEach(p => csv += `${p.name},${p.loc},${p.total},${p.available},${p.note}\n`);
         const link = document.createElement("a");
         link.href = URL.createObjectURL(new Blob([csv], {type:'text/csv'}));
-        link.download = "庫存盤點表.csv"; link.click();
+        link.download = `盤點表_${new Date().toLocaleDateString()}.csv`;
+        link.click();
     }
 
     function showPage(id) {
