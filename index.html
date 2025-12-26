@@ -3,35 +3,36 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>專業庫存安全系統 v13.0</title>
+    <title>專業庫存安全系統 v13.5</title>
     <style>
         :root { --primary: #2c3e50; --accent: #3498db; --success: #27ae60; --danger: #e74c3c; }
         body { font-family: "Microsoft JhengHei", sans-serif; background: #f4f7f6; margin: 0; padding: 0; }
         nav { background: var(--primary); color: white; display: flex; justify-content: center; padding: 10px; gap: 5px; position: sticky; top: 0; z-index: 100; }
-        nav button { background: rgba(255,255,255,0.1); border: none; color: white; padding: 10px; cursor: pointer; border-radius: 5px; }
+        nav button { background: rgba(255,255,255,0.1); border: none; color: white; padding: 10px; cursor: pointer; border-radius: 5px; font-size: 0.9rem; }
         nav button.active { background: var(--accent); font-weight: bold; }
         .container { max-width: 1100px; margin: 15px auto; padding: 15px; }
         .page { display: none; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
         .page.active { display: block; }
         .sync-status { text-align: center; font-size: 11px; padding: 5px; background: #eee; color: #666; }
         .input-group { display: flex; gap: 8px; margin-bottom: 15px; flex-wrap: wrap; }
-        input, select { padding: 8px; border: 1px solid #ddd; border-radius: 5px; flex: 1; }
+        input, select { padding: 8px; border: 1px solid #ddd; border-radius: 5px; flex: 1; min-width: 100px; }
         button.btn { padding: 8px 15px; border: none; border-radius: 5px; cursor: pointer; font-weight: bold; color: white; }
         .btn-add { background: var(--success); }
         .btn-action { background: var(--accent); }
         .btn-del { background: var(--danger); font-size: 0.8rem; }
-        .location-badge { background: #e1f5fe; color: #01579b; padding: 2px 8px; border-radius: 4px; font-weight: bold; }
+        .location-badge { background: #e1f5fe; color: #01579b; padding: 2px 8px; border-radius: 4px; font-weight: bold; font-size: 0.85rem; }
         table { width: 100%; border-collapse: collapse; margin-top: 10px; }
         th, td { border-bottom: 1px solid #eee; padding: 12px 10px; text-align: left; }
         #authOverlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--primary); color: white; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 2000; }
+        .history-del { background-color: #fff5f5; color: var(--danger); }
     </style>
 </head>
 <body>
 
 <div id="authOverlay">
     <h2>🔒 系統鎖定</h2>
-    <input type="password" id="sysKeyInput" style="flex:none; width: 180px; margin-bottom: 15px; text-align: center;" placeholder="輸入金鑰">
-    <button class="btn btn-action" onclick="initSystem()">解鎖進入</button>
+    <input type="password" id="sysKeyInput" style="flex:none; width: 200px; margin-bottom: 15px; text-align: center;" placeholder="輸入金鑰">
+    <button class="btn btn-action" onclick="initSystem()">解鎖並進入系統</button>
 </div>
 
 <div class="sync-status" id="syncLabel">狀態：等待解鎖</div>
@@ -46,7 +47,7 @@
 
 <div class="container">
     <div id="p1" class="page active">
-        <h3>新增品項</h3>
+        <h3>新增品項與倉位</h3>
         <div class="input-group">
             <input type="text" id="pName" placeholder="名稱">
             <input type="number" id="pQty" placeholder="數量">
@@ -63,24 +64,25 @@
     </div>
 
     <div id="p3" class="page">
-        <h3>🛒 外借購物車</h3>
+        <h3>🛒 外借購物車系統</h3>
         <div style="background:#f0f7ff; padding:15px; border-radius:10px; margin-bottom:20px; border:2px dashed #3498db;">
             <div class="input-group">
                 <select id="cartProductSelect"></select>
                 <input type="number" id="cartQty" value="1" min="1" style="width:60px; flex:none;">
-                <button class="btn btn-add" onclick="addToCart()">➕ 加入</button>
+                <button class="btn btn-add" onclick="addToCart()">➕ 加入清單</button>
             </div>
             <table id="cartTable"><thead><tr><th>品項</th><th>數量</th><th>操作</th></tr></thead><tbody></tbody></table>
             <div class="input-group" style="margin-top:10px;">
-                <input type="text" id="loanUser" placeholder="借用人姓名">
-                <button class="btn btn-action" onclick="checkoutCart()" style="flex:2;">🚀 批次借出</button>
+                <input type="text" id="loanUser" placeholder="輸入借用人姓名">
+                <button class="btn btn-action" onclick="checkoutCart()" style="flex:2;">🚀 確認批次借出</button>
             </div>
         </div>
+        <h3>目前已借出 (歸還區)</h3>
         <table id="loanTable"><thead><tr><th>借用人</th><th>物品</th><th>數量</th><th>操作</th></tr></thead><tbody></tbody></table>
     </div>
 
     <div id="p4" class="page">
-        <h3>盤點修正</h3>
+        <h3>年度盤點修正</h3>
         <table id="stocktakeTable"><thead><tr><th>名稱</th><th>帳面數</th><th>操作</th></tr></thead><tbody></tbody></table>
     </div>
 
@@ -91,74 +93,65 @@
 </div>
 
 <script>
-    // ⚠️ 檢查點：請確保這裡填入了正確的部署網址
+    // ⚠️ 關鍵：請確保這裡替換成你的 Google Script 網址
     const API_URL = "https://script.google.com/macros/s/AKfycbzabXBVljgap-NVRWnv3w73CGRZuIDAR48K2kpCOOjq1tyYu_gQavJe_lBO0u-Px71Yqw/exec"; 
-    let sysKey = "1225"; // 你設定的系統金鑰
+    
+    let sysKey = "1225";
     let products = [], loans = [], history = [], cart = [];
 
     async function initSystem() {
-        const inputKey = document.getElementById('sysKeyInput').value;
-        if(inputKey === sysKey) {
-            document.getElementById('syncLabel').innerText = "驗證通過，正在連接資料庫...";
-            // 嘗試同步，如果 API 網址是空的或錯的，會在這裡報錯
+        const val = document.getElementById('sysKeyInput').value;
+        if (val === sysKey) {
             try {
-                const isSuccess = await syncFromCloud();
-                if(isSuccess) {
+                document.getElementById('syncLabel').innerText = "驗證中...";
+                const success = await syncFromCloud();
+                if (success) {
                     document.getElementById('authOverlay').style.display = 'none';
+                    renderAll();
                 }
             } catch (e) {
-                alert("連線失敗！請檢查 index.html 內的 API_URL 是否填寫正確。");
-                console.error(e);
+                alert("連線出錯，請確認 API 網址是否正確且已發佈為 Anyone！");
             }
         } else {
-            alert("金鑰錯誤，請重新輸入！");
+            alert("金鑰錯誤！");
         }
     }
 
     async function syncFromCloud() {
-        if(API_URL.includes("請在此處填入")) {
-            alert("尚未填寫 API_URL，請先修改程式碼。");
-            return false;
-        }
-        document.getElementById('syncLabel').innerText = "雲端同步中...";
-        try {
-            const res = await fetch(`${API_URL}?key=${sysKey}`);
-            const data = await res.json();
-            if(data.error) {
-                alert("雲端拒絕連線：" + data.error);
-                return false;
-            }
-            products = data.products || [];
-            loans = data.loans || [];
-            history = data.history || [];
-            renderAll();
-            document.getElementById('syncLabel').innerText = "同步成功";
-            return true;
-        } catch (e) {
-            document.getElementById('syncLabel').innerText = "連線失敗，請檢查網址或網路";
-            throw e;
-        }
+        if (!API_URL || API_URL.includes("你的_")) return alert("請在代碼中填寫 API_URL");
+        const res = await fetch(`${API_URL}?key=${sysKey}`);
+        const data = await res.json();
+        products = data.products || [];
+        loans = data.loans || [];
+        history = data.history || [];
+        document.getElementById('syncLabel').innerText = "同步成功";
+        return true;
     }
-    // ... 其餘函數保持不變 ...
-</script>
 
     async function save() {
-        document.getElementById('syncLabel').innerText = "儲存中...";
-        try {
-            await fetch(API_URL, {
-                method: 'POST',
-                mode: 'no-cors',
-                body: JSON.stringify({ key: sysKey, data: { products, loans, history } })
-            });
-            document.getElementById('syncLabel').innerText = "儲存成功";
-        } catch (e) { document.getElementById('syncLabel').innerText = "儲存失敗"; }
+        document.getElementById('syncLabel').innerText = "雲端儲存中...";
+        await fetch(API_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            body: JSON.stringify({ key: sysKey, data: { products, loans, history } })
+        });
+        document.getElementById('syncLabel').innerText = "已儲存";
         renderAll();
     }
 
-    // --- 關鍵修復：移倉功能 ---
-    function moveLocation(pid) {
-        const p = products.find(item => item.id == pid);
-        if(!p) return;
-        const oldLoc = p.loc || "未設定";
-        const newLoc = prompt(`變更「${
+    function renderAll() {
+        // 渲染建檔
+        const sBody = document.querySelector("#setupTable tbody");
+        if(sBody) sBody.innerHTML = products.map(p => `<tr><td>${p.name}</td><td>${p.total}</td><td>${p.loc || ''}</td><td><button class="btn btn-del" onclick="deleteProduct(${p.id})">刪除</button></td></tr>`).join('');
 
+        // 渲染總表 (含移倉功能)
+        const fBody = document.querySelector("#fullTable tbody");
+        if(fBody) fBody.innerHTML = products.map(p => `<tr><td>${p.name}</td><td>${p.total}/${p.available}</td><td><span class="location-badge">${p.loc || '未定'}</span></td><td><button class="btn btn-action" onclick="moveLocation(${p.id})" style="padding:4px 8px; font-size:0.8rem">📦 搬移</button></td></tr>`).join('');
+
+        // 渲染歸還
+        const lBody = document.querySelector("#loanTable tbody");
+        if(lBody) lBody.innerHTML = loans.map(l => `<tr><td>${l.user}</td><td>${l.pname}</td><td>${l.qty}</td><td><button class="btn btn-action" onclick="returnItem(${l.id})">歸還</button></td></tr>`).join('');
+
+        // 渲染紀錄
+        const hBody = document.querySelector("#historyTable tbody");
+        if(hBody) hBody.innerHTML = history.map(h => `<tr class="${h.new === '已刪除' ? 'history-del' : ''}"><td>${h.time}</td><td>${h.name}</td><td>${
