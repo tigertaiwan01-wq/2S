@@ -91,30 +91,56 @@
 </div>
 
 <script>
+    // ⚠️ 檢查點：請確保這裡填入了正確的部署網址
     const API_URL = "https://script.google.com/macros/s/AKfycbzabXBVljgap-NVRWnv3w73CGRZuIDAR48K2kpCOOjq1tyYu_gQavJe_lBO0u-Px71Yqw/exec"; 
-    let sysKey = "";
+    let sysKey = "1225"; // 你設定的系統金鑰
     let products = [], loans = [], history = [], cart = [];
 
-    function initSystem() {
-        sysKey = document.getElementById('sysKeyInput').value;
-        if(sysKey === "1225") {
-            document.getElementById('authOverlay').style.display = 'none';
-            syncFromCloud();
-        } else { alert("金鑰錯誤！"); }
+    async function initSystem() {
+        const inputKey = document.getElementById('sysKeyInput').value;
+        if(inputKey === sysKey) {
+            document.getElementById('syncLabel').innerText = "驗證通過，正在連接資料庫...";
+            // 嘗試同步，如果 API 網址是空的或錯的，會在這裡報錯
+            try {
+                const isSuccess = await syncFromCloud();
+                if(isSuccess) {
+                    document.getElementById('authOverlay').style.display = 'none';
+                }
+            } catch (e) {
+                alert("連線失敗！請檢查 index.html 內的 API_URL 是否填寫正確。");
+                console.error(e);
+            }
+        } else {
+            alert("金鑰錯誤，請重新輸入！");
+        }
     }
 
     async function syncFromCloud() {
+        if(API_URL.includes("請在此處填入")) {
+            alert("尚未填寫 API_URL，請先修改程式碼。");
+            return false;
+        }
         document.getElementById('syncLabel').innerText = "雲端同步中...";
         try {
             const res = await fetch(`${API_URL}?key=${sysKey}`);
             const data = await res.json();
+            if(data.error) {
+                alert("雲端拒絕連線：" + data.error);
+                return false;
+            }
             products = data.products || [];
             loans = data.loans || [];
             history = data.history || [];
             renderAll();
             document.getElementById('syncLabel').innerText = "同步成功";
-        } catch (e) { document.getElementById('syncLabel').innerText = "連線失敗"; }
+            return true;
+        } catch (e) {
+            document.getElementById('syncLabel').innerText = "連線失敗，請檢查網址或網路";
+            throw e;
+        }
     }
+    // ... 其餘函數保持不變 ...
+</script>
 
     async function save() {
         document.getElementById('syncLabel').innerText = "儲存中...";
@@ -135,3 +161,4 @@
         if(!p) return;
         const oldLoc = p.loc || "未設定";
         const newLoc = prompt(`變更「${
+
